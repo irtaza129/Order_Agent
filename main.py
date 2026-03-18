@@ -11,6 +11,13 @@ from agent.langgraph_agent import process_order
 if not os.getenv("OPENAI_API_KEY"):
     print("WARNING: OPENAI_API_KEY is not set.\n")
 
+MAX_HISTORY = 4  # number of turns (1 turn = 1 user msg + 1 agent reply) to keep
+
+
+def _trim_history(history: list) -> list:
+    """Keep only the last MAX_HISTORY turns (each turn = 2 entries)."""
+    return history[-(MAX_HISTORY * 2):]
+
 
 def _print_result(result: dict) -> None:
     print(f"  Status  : {result['status'].upper()}")
@@ -33,6 +40,8 @@ def run_cli() -> None:
     print("  Type 'quit' to exit.")
     print("=" * 60 + "\n")
 
+    history = []   # list of {"role": "user"|"assistant", "content": str}
+
     while True:
         try:
             raw = input("You: ").strip()
@@ -45,51 +54,66 @@ def run_cli() -> None:
             print("Agent: Goodbye!")
             break
 
-        result = process_order(raw_input=raw, customer_id="cli_user")
+        result = process_order(
+            raw_input=raw,
+            customer_id="cli_user",
+            history=_trim_history(history),
+        )
         print(f"\nAgent: {result['voice_reply']}")
 
-        # If agent needs clarification, collect answer and re-submit as a
-        # combined message so the mapping agent has full context
+        # Clarification loop — agent asks a follow-up question
         while result["status"] == "clarification":
+            # Log the clarification exchange into history
+            history.append({"role": "user",      "content": raw})
+            history.append({"role": "assistant",  "content": result["voice_reply"]})
+            history = _trim_history(history)
+
             try:
                 followup = input("You: ").strip()
             except (EOFError, KeyboardInterrupt):
                 break
             if not followup:
                 continue
-            # Re-submit original request + clarification answer together
+
+            raw = followup   # update raw so history is logged correctly below
             clarification_context = (
                 f"Agent asked: {result['voice_reply']} "
                 f"Customer answered: {followup}"
             )
-# → "Agent asked: It seems like you meant the Mighty combo. Would you like to order that?
-#    Customer answered: yes"
-# mapping LLM now has full context — knows exactly what was being confirmed
-            result   = process_order(raw_input=clarification_context, customer_id="cli_user")
+            result = process_order(
+                raw_input=clarification_context,
+                customer_id="cli_user",
+                history=_trim_history(history),
+            )
             print(f"\nAgent: {result['voice_reply']}")
+
+        # Log this turn into history
+        history.append({"role": "user",      "content": raw})
+        history.append({"role": "assistant",  "content": result["voice_reply"]})
+        history = _trim_history(history)
 
         _print_result(result)
 
 
 def run_demo() -> None:
     cases = [
-        "I want 1 mighty combo",
-        "Give me a drink",                   # should ask: Pepsi, MD, or 7UP?
-        "I want 3 piece chicken",            # should ask: Original or Extra Crispy?
-        "I want a beef burger",              # invalid
+        "I want 1 original recipe chicken",
+        "add one 7up large and repeat my order",   # tests history
         "Show me the menu",
-        "Add Spicy Wings to the menu for 350 PKR",
-        "Update item 3 — change the price to 800 PKR",
-        "Delete item 5 from the menu",
         "thats all thank you",
     ]
     print("=" * 60)
     print("  KFC Agent — Demo Mode")
     print("=" * 60 + "\n")
+
+    history = []
     for case in cases:
         print(f"Customer : {case}")
-        result = process_order(raw_input=case)
+        result = process_order(raw_input=case, history=_trim_history(history))
         print(f"Agent    : {result['voice_reply']}")
+        history.append({"role": "user",     "content": case})
+        history.append({"role": "assistant", "content": result["voice_reply"]})
+        history = _trim_history(history)
         _print_result(result)
         print("-" * 60)
 

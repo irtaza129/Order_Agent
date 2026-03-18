@@ -2,15 +2,15 @@
 KFC Order & Menu Management Agent — agent/langgraph_agent.py
 
 Graph flow:
-    load_menu → classify_intent → [router] → place_order_map → [router] → place_order_exec    → END
-                                                                        → ask_clarification    → END
-                                                                        → handle_unknown       → END
-                                           → get_menu                                          → END
-                                           → create_item                                       → END
-                                           → update_item                                       → END
-                                           → delete_item                                       → END
-                                           → end_order                                         → END
-                                           → handle_unknown                                    → END
+    load_menu → classify_intent → [router] → place_order_map → [router] → place_order_exec   → END
+                                                                        → ask_clarification   → END
+                                                                        → handle_unknown      → END
+                                           → get_menu                                         → END
+                                           → create_item                                      → END
+                                           → update_item                                      → END
+                                           → delete_item                                      → END
+                                           → end_order                                        → END
+                                           → handle_unknown                                   → END
 """
 
 import json
@@ -41,6 +41,7 @@ _oai = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 class OrderState(TypedDict):
     raw_input:      str
     customer_id:    Optional[str]
+    history:        list        # rolling window of past turns
     menu:           dict
     intent:         str
     intent_payload: dict
@@ -50,11 +51,30 @@ class OrderState(TypedDict):
     status:         str
 
 
+# ── History helper ────────────────────────────────────────────────────────────
+
+def _history_block(history: list) -> str:
+    """
+    Converts history list into a compact text block injected into prompts.
+    e.g.
+      [Conversation so far]
+      User: I want original recipe chicken
+      Agent: Got it! Added Original Recipe Chicken (3 pcs). Order ORD-123. Anything else?
+    """
+    if not history:
+        return ""
+    lines = ["[Conversation so far]"]
+    for msg in history:
+        role = "User" if msg["role"] == "user" else "Agent"
+        lines.append(f"{role}: {msg['content']}")
+    return "\n".join(lines) + "\n\n"
+
+
 # ── Intent prompt ─────────────────────────────────────────────────────────────
 
 _INTENT_PROMPT = """\
 You are the intent classifier for a KFC AI ordering system.
-Classify the user message and output ONLY valid JSON, no markdown.
+Classify the user message and return json. Output ONLY valid JSON, no markdown.
 
 Intents: PLACE_ORDER | GET_MENU | CREATE_ITEM | UPDATE_ITEM | DELETE_ITEM | END_ORDER | UNKNOWN
 
@@ -77,8 +97,9 @@ Rules:
 - Extract item_id as integer from phrases like "item 8". If not found set -1.
 - PLACE_ORDER is the DEFAULT for any food or drink request, even vague ones like
   "that corn thing", "the potato one", "something spicy", "that burger".
-  When in doubt, choose PLACE_ORDER — the mapping agent will handle fuzzy matching
-  and clarification.
+  When in doubt, choose PLACE_ORDER — the mapping agent will handle fuzzy matching.
+- Use the conversation history to resolve references like "repeat my order",
+  "add the same again", "make that two" — look at what was previously ordered.
 - END_ORDER when the customer signals they have finished ordering and don't want
   anything else. Look for the intent behind the words, not just keywords — if the
   customer is indicating they are satisfied and wrapping up the interaction, that is
@@ -109,16 +130,20 @@ def node_load_menu(state: OrderState) -> OrderState:
 
 def node_classify_intent(state: OrderState) -> OrderState:
     print(f"[Node: intent] '{state['raw_input']}'")
-    resp = _oai.chat.completions.create(
-        model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
-        temperature=0,
-        response_format={"type": "json_object"},
-        messages=[
-            {"role": "system", "content": _INTENT_PROMPT},
-            {"role": "user",   "content": state["raw_input"]},
-        ],
+
+    # Prepend history so the classifier understands references like "repeat my order"
+    input_with_history = (
+        _history_block(state["history"])
+        + f"Classify this message and return json: {state['raw_input']}"
     )
-    parsed = json.loads(resp.choices[0].message.content)
+
+    resp = _oai.responses.create(
+        model=os.getenv("OPENAI_MODEL", "gpt-5-mini"),
+        instructions=_INTENT_PROMPT,
+        input=input_with_history,
+        text={"format": {"type": "json_object"}},
+    )
+    parsed = json.loads(resp.output_text)
     intent = parsed.get("intent", "UNKNOWN")
     print(f"[Node: intent] → {intent}")
     return {**state, "intent": intent, "intent_payload": parsed.get("payload", {})}
@@ -126,7 +151,11 @@ def node_classify_intent(state: OrderState) -> OrderState:
 
 def node_place_order_map(state: OrderState) -> OrderState:
     print("[Node: place_order_map] Mapping order ...")
-    mapping_result = call_mapping_llm(raw_order=state["raw_input"], menu=state["menu"])
+    mapping_result = call_mapping_llm(
+        raw_order=state["raw_input"],
+        menu=state["menu"],
+        history=state["history"],       # ← pass history to mapping agent
+    )
     needs_clarification = mapping_result.get("needs_clarification", False)
     print(f"[Node: place_order_map] valid={mapping_result['is_valid']}  "
           f"needs_clarification={needs_clarification}")
@@ -134,18 +163,12 @@ def node_place_order_map(state: OrderState) -> OrderState:
 
 
 def node_ask_clarification(state: OrderState) -> OrderState:
-    """Returned when the mapping agent needs more info from the customer."""
     question = state["mapping_result"].get(
         "clarification_question",
         "Could you clarify your order? We have a few options available."
     )
     print(f"[Node: ask_clarification] → '{question}'")
-    return {
-        **state,
-        "api_response": {},
-        "voice_reply":  question,
-        "status":       "clarification",   # distinct status so CLI can handle it
-    }
+    return {**state, "api_response": {}, "voice_reply": question, "status": "clarification"}
 
 
 def node_place_order_exec(state: OrderState) -> OrderState:
@@ -305,10 +328,15 @@ order_graph = build_order_graph()
 
 # ── Public entry-point ────────────────────────────────────────────────────────
 
-def process_order(raw_input: str, customer_id: Optional[str] = None) -> dict:
+def process_order(
+    raw_input:   str,
+    customer_id: Optional[str] = None,
+    history:     list          = None,
+) -> dict:
     final = order_graph.invoke({
         "raw_input":      raw_input,
         "customer_id":    customer_id,
+        "history":        history or [],
         "menu":           {},
         "intent":         "",
         "intent_payload": {},
