@@ -1,0 +1,11 @@
+{
+  "single_items": [
+    {"id": "itm_01", "name": "Zinger Burger", "price": 500},
+    {"id": "itm_02", "name": "Pepsi 250ml", "aliases": ["drink", "cola", "soda"], "price": 100},
+    {"id": "itm_03", "name": "Fries", "price": 150}
+  ],
+  "deals": [
+    {"id": "deal_01", "name": "Mighty Combo", "includes": ["Zinger Burger", "Fries", "Pepsi 250ml"], "price": 700},
+    {"id": "deal_02", "name": "Zinger Deal", "includes": ["Zinger Burger", "Pepsi 250ml"], "price": 550}
+  ]
+}
