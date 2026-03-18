@@ -22,7 +22,17 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from agent.langgraph_agent import process_order
 
+from fastapi.middleware.cors import CORSMiddleware
+
 app = FastAPI(title="KFC Order Agent API")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 MAX_HISTORY_TURNS = 4   # keep last N turns (1 turn = 1 user + 1 agent message)
 
