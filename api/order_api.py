@@ -3,7 +3,8 @@ Order API — api/order_api.py
 """
 
 import os
-import uuid
+import json
+import logging
 
 import requests
 from dotenv import load_dotenv
@@ -17,6 +18,14 @@ BASE_URL = os.getenv("API_BASE_URL", "https://voiceai-hzyb.onrender.com")
 TIMEOUT  = int(os.getenv("API_TIMEOUT", 60))
 HEADERS  = {"accept": "application/json", "Content-Type": "application/json"}
 
+# ── Logger ────────────────────────────────────────────────────────────────────
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [ORDER_API] %(levelname)s — %(message)s",
+    datefmt="%H:%M:%S",
+)
+log = logging.getLogger("order_api")
+
 
 def _session():
     session = requests.Session()
@@ -25,7 +34,8 @@ def _session():
     return session
 
 
-def _handle(response):
+def _handle(response, label: str) -> dict:
+    log.info("← %s | status=%s | body=%s", label, response.status_code, response.text[:300])
     try:
         response.raise_for_status()
         return response.json()
@@ -36,31 +46,55 @@ def _handle(response):
 
 
 def get_menu():
-    resp = _session().get(f"{BASE_URL}/menu", headers=HEADERS, timeout=TIMEOUT)
-    return _handle(resp)
+    url = f"{BASE_URL}/menu"
+    log.info("→ GET %s", url)
+    resp = _session().get(url, headers=HEADERS, timeout=TIMEOUT)
+    return _handle(resp, "GET /menu")
 
 
 def create_menu_item(name, category, price, description="", available=True):
+    url     = f"{BASE_URL}/menu"
     payload = {"name": name, "category": category,
                "description": description, "price": price, "available": available}
-    resp = _session().post(f"{BASE_URL}/menu", json=payload, headers=HEADERS, timeout=TIMEOUT)
-    return _handle(resp)
+    log.info("→ POST %s | payload=%s", url, json.dumps(payload))
+    resp = _session().post(url, json=payload, headers=HEADERS, timeout=TIMEOUT)
+    return _handle(resp, "POST /menu")
 
 
 def update_menu_item(item_id, name, category, price, description="", available=True):
+    url     = f"{BASE_URL}/menu/{item_id}"
     payload = {"name": name, "category": category,
                "description": description, "price": price, "available": available}
-    resp = _session().put(f"{BASE_URL}/menu/{item_id}", json=payload, headers=HEADERS, timeout=TIMEOUT)
-    return _handle(resp)
+    log.info("→ PUT %s | payload=%s", url, json.dumps(payload))
+    resp = _session().put(url, json=payload, headers=HEADERS, timeout=TIMEOUT)
+    return _handle(resp, f"PUT /menu/{item_id}")
 
 
 def delete_menu_item(item_id):
-    resp = _session().delete(f"{BASE_URL}/menu/{item_id}", headers=HEADERS, timeout=TIMEOUT)
-    return _handle(resp)
+    url = f"{BASE_URL}/menu/{item_id}"
+    log.info("→ DELETE %s", url)
+    resp = _session().delete(url, headers=HEADERS, timeout=TIMEOUT)
+    return _handle(resp, f"DELETE /menu/{item_id}")
 
 
-def create_order(cart):
-    order_total = sum(item.get("total_price", 0) for item in cart)
-    order_id    = f"ORD-{uuid.uuid4().hex[:8].upper()}"
-    return {"order_id": order_id, "status": "created",
-            "cart": cart, "order_total": order_total}
+def create_order(cart, customer_name: str = "Guest"):
+    """
+    POST /orders
+    Transforms internal cart into API payload:
+        {"customer_name": str, "items": [{"menu_item_id": int, "quantity": int}]}
+    """
+    url   = f"{BASE_URL}/orders"
+    items = [
+        {
+            "menu_item_id": int(item["item_id"]),
+            "quantity":     int(item.get("qty", 1)),
+        }
+        for item in cart
+    ]
+    payload = {"customer_name": customer_name, "items": items}
+
+    log.info("→ POST %s | payload=%s", url, json.dumps(payload))
+    resp   = _session().post(url, json=payload, headers=HEADERS, timeout=TIMEOUT)
+    result = _handle(resp, "POST /orders")
+    log.info("Order placed in DB: %s", json.dumps(result))
+    return result

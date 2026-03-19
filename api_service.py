@@ -22,17 +22,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from agent.langgraph_agent import process_order
 
-from fastapi.middleware.cors import CORSMiddleware
-
 app = FastAPI(title="KFC Order Agent API")
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 MAX_HISTORY_TURNS = 4   # keep last N turns (1 turn = 1 user + 1 agent message)
 
@@ -85,7 +75,7 @@ def order_endpoint(req: OrderRequest):
     return OrderResponse(
         voice_reply=result["voice_reply"],
         status=result["status"],
-        order_id=result.get("order_id"),
+        order_id=str(result["order_id"]) if result.get("order_id") is not None else None,
         order_total=result.get("order_total"),
         session_id=req.session_id,
     )
@@ -115,3 +105,7 @@ def root():
         "message":  "KFC Order Agent API is running",
         "sessions": len(_sessions),
     }
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("api_service:app", host="0.0.0.0", port=8000, reload=True)

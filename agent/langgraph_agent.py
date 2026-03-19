@@ -177,13 +177,16 @@ def node_place_order_exec(state: OrderState) -> OrderState:
         return {**state, "api_response": {}, "status": "error",
                 "voice_reply": mapping.get("invalid_reason", "Sorry, I couldn't process that order.")}
     cart         = mapping["final_cart"]
-    api_response = create_order(cart)
+    api_response = create_order(cart, customer_name=state.get("customer_id") or "Guest")
     item_names   = ", ".join(i["name"] for i in cart)
     savings      = mapping.get("savings", 0)
     savings_text = f" You saved PKR {savings} with a deal!" if savings > 0 else ""
+    # real API returns "id", fallback to "order_id" for compatibility
+    order_id     = api_response.get("id") or api_response.get("order_id", "N/A")
     voice_reply  = (f"Got it! I've added {item_names} to your order.{savings_text} "
-                    f"Your order ID is {api_response['order_id']}. Anything else?")
-    print(f"[Node: place_order_exec] Order created: {api_response['order_id']}")
+                    f"Your order ID is {order_id}. Anything else?")
+    print(f"[Node: place_order_exec] Order created: {order_id}")
+    api_response["order_id"] = order_id  # normalise key for downstream use
     return {**state, "api_response": api_response, "voice_reply": voice_reply, "status": "success"}
 
 
@@ -350,4 +353,4 @@ def process_order(
         "voice_reply": final["voice_reply"],
         "order_id":    final.get("api_response", {}).get("order_id"),
         "order_total": final.get("api_response", {}).get("order_total"),
-    }
+    }   
