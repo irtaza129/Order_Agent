@@ -109,6 +109,25 @@ Rules:
 """
 
 
+def classify_intent_only(text: str, history: list | None = None) -> str:
+    """Fast intent-only classifier used by the /intent endpoint.
+    Returns the intent string (e.g. PLACE_ORDER, GET_MENU, UNKNOWN).
+    This performs a single, minimal LLM call and returns quickly.
+    """
+    input_with_history = _history_block(history or []) + f"Classify this message and return json: {text}"
+    resp = _oai.responses.create(
+        model=os.getenv("OPENAI_MODEL", "gpt-5-mini"),
+        instructions=_INTENT_PROMPT,
+        input=input_with_history,
+        text={"format": {"type": "json_object"}},
+    )
+    try:
+        parsed = json.loads(resp.output_text)
+        return parsed.get("intent", "UNKNOWN")
+    except Exception:
+        return "UNKNOWN"
+
+
 # ── Nodes ─────────────────────────────────────────────────────────────────────
 
 def node_load_menu(state: OrderState) -> OrderState:

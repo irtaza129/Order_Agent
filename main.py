@@ -6,7 +6,7 @@ Run from Order_Agent/: python main.py
 import os
 import sys
 
-from agent.langgraph_agent import process_order
+from agent.langgraph_agent import process_order, classify_intent_only
 
 if not os.getenv("OPENAI_API_KEY"):
     print("WARNING: OPENAI_API_KEY is not set.\n")
@@ -119,6 +119,15 @@ def run_demo() -> None:
 
 
 if __name__ == "__main__":
+    if len(sys.argv) > 1 and sys.argv[1] == "intent":
+        # Quick CLI to test the fast intent classifier:
+        if len(sys.argv) < 3:
+            print("Usage: python main.py intent <text>")
+            sys.exit(1)
+        text = " ".join(sys.argv[2:])
+        intent = classify_intent_only(text, [])
+        print(f"Intent: {intent}")
+        sys.exit(0)
     if len(sys.argv) > 1 and sys.argv[1] == "demo":
         run_demo()
     else:

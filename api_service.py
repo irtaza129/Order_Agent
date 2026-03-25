@@ -20,11 +20,22 @@ load_dotenv(Path(__file__).resolve().parent / ".env")
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from agent.langgraph_agent import process_order
+from agent.langgraph_agent import process_order, classify_intent_only
 
 app = FastAPI(title="KFC Order Agent API")
 
 MAX_HISTORY_TURNS = 4   # keep last N turns (1 turn = 1 user + 1 agent message)
+
+# Map intents to short filler keys (client caches .wav for these keys)
+FILLER_MAP = {
+    "PLACE_ORDER": "processing",
+    "GET_MENU":    "fetching",
+    "CREATE_ITEM": "processing",
+    "UPDATE_ITEM": "processing",
+    "DELETE_ITEM": "processing",
+    "END_ORDER":   None,
+    "UNKNOWN":     None,
+}
 
 # ── In-memory session store ────────────────────────────────────────────────
 # key:   session_id (str)
@@ -51,6 +62,26 @@ class OrderResponse(BaseModel):
     order_id:    str | None = None
     order_total: float | None = None
     session_id:  str
+
+
+# Lightweight intent-only request/response for pre-flight intent check
+class IntentRequest(BaseModel):
+    text:       str
+    session_id: str
+
+
+class IntentResponse(BaseModel):
+    intent: str
+    filler: str | None = None
+
+
+# Fast intent endpoint: classify intent and return filler key for client TTS cache
+@app.post("/intent", response_model=IntentResponse)
+def intent_endpoint(req: IntentRequest):
+    history = _sessions.get(req.session_id, [])
+    intent = classify_intent_only(req.text, _trim(history))
+    filler = FILLER_MAP.get(intent)
+    return IntentResponse(intent=intent, filler=filler)
 
 
 # ── Endpoints ──────────────────────────────────────────────────────────────
