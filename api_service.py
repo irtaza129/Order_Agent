@@ -19,10 +19,20 @@ from pathlib import Path
 load_dotenv(Path(__file__).resolve().parent / ".env")
 
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from agent.langgraph_agent import process_order, classify_intent_only
 
 app = FastAPI(title="KFC Order Agent API")
+
+# CORS: allow calls from browser clients during development
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # In production, replace with specific origins
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 MAX_HISTORY_TURNS = 4   # keep last N turns (1 turn = 1 user + 1 agent message)
 
