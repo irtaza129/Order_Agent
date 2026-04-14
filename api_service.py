@@ -39,12 +39,13 @@ MAX_HISTORY_TURNS = 4   # keep last N turns (1 turn = 1 user + 1 agent message)
 # Map intents to short filler keys (client caches .wav for these keys)
 FILLER_MAP = {
     "PLACE_ORDER": "processing",
-    "GET_MENU":    "fetching",
+    "GET_MENU": "fetching",
     "CREATE_ITEM": "processing",
     "UPDATE_ITEM": "processing",
     "DELETE_ITEM": "processing",
-    "END_ORDER":   None,
-    "UNKNOWN":     None,
+    "END_ORDER": None,
+    "UNKNOWN": None,
+    "SMALL_TALK": None
 }
 
 # ── In-memory session store ────────────────────────────────────────────────
@@ -98,25 +99,37 @@ def intent_endpoint(req: IntentRequest):
 
 @app.post("/order", response_model=OrderResponse)
 def order_endpoint(req: OrderRequest):
-    # 1. Load existing history for this session (empty list if new session)
+
     history = _sessions.get(req.session_id, [])
 
-    # 2. Call the LangGraph agent with history
+    # 🔴 EARLY SMALL TALK CHECK
+    intent_result = classify_intent_only(req.text, _trim(history))
+
+    if intent_result in ["UNKNOWN", "SMALL_TALK"]:
+        return OrderResponse(
+            voice_reply="Hey! Welcome to KFC 😊 What would you like to order?",
+            status="small_talk",
+            order_id=None,
+            order_total=None,
+            session_id=req.session_id,
+        )
+
+    # ONLY THEN run graph
     result = process_order(
         raw_input=req.text,
         customer_id=req.customer_id,
         history=_trim(history),
     )
 
-    # 3. Append this turn to history and save back
+    # Append this turn to history and save back
     history.append({"role": "user",      "content": req.text})
-    history.append({"role": "assistant", "content": result["voice_reply"]})
+    history.append({"role": "assistant", "content": result.get("voice_reply", "")})
     _sessions[req.session_id] = _trim(history)
 
     return OrderResponse(
-        voice_reply=result["voice_reply"],
-        status=result["status"],
-        order_id=str(result["order_id"]) if result.get("order_id") is not None else None,
+        voice_reply=result.get("voice_reply", ""),
+        status=result.get("status", "error"),
+        order_id=str(result.get("order_id")) if result.get("order_id") is not None else None,
         order_total=result.get("order_total"),
         session_id=req.session_id,
     )

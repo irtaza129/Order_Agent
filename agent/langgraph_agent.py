@@ -76,7 +76,7 @@ _INTENT_PROMPT = """\
 You are the intent classifier for a KFC AI ordering system.
 Classify the user message and return json. Output ONLY valid JSON, no markdown.
 
-Intents: PLACE_ORDER | GET_MENU | CREATE_ITEM | UPDATE_ITEM | DELETE_ITEM | END_ORDER | UNKNOWN
+Intents: PLACE_ORDER | GET_MENU | CREATE_ITEM | UPDATE_ITEM | DELETE_ITEM | END_ORDER | UNKNOWN | SMALL_TALK
 
 Output schema:
 {
@@ -106,6 +106,8 @@ Rules:
   END_ORDER. Examples: "thats all", "that's it", "thank you that'd be it",
   "i'm good", "nothing else", "no that's everything", "all done", "bye".
 - UNKNOWN only for truly unrelated requests like "play music" or "what's the weather".
+-If message is ONLY greeting or casual chat:
+→ return intent = SMALL_TALK
 """
 
 
@@ -170,15 +172,37 @@ def node_classify_intent(state: OrderState) -> OrderState:
 
 def node_place_order_map(state: OrderState) -> OrderState:
     print("[Node: place_order_map] Mapping order ...")
+
     mapping_result = call_mapping_llm(
         raw_order=state["raw_input"],
         menu=state["menu"],
-        history=state["history"],       # ← pass history to mapping agent
+        history=state["history"],  # ← pass history to mapping agent
     )
+
+    # 🔴 Small talk short-circuit (MUST come AFTER mapping_result is created)
+    if mapping_result.get("is_small_talk"):
+        print("[Node: place_order_map] Detected small talk")
+        return {
+            **state,
+            "mapping_result": mapping_result,
+            "api_response": {},
+            "voice_reply": mapping_result.get(
+                "reply",
+                "Hello! What can I get for you?"
+            ),
+            "status": "small_talk"
+        }
+
     needs_clarification = mapping_result.get("needs_clarification", False)
-    print(f"[Node: place_order_map] valid={mapping_result['is_valid']}  "
-          f"needs_clarification={needs_clarification}")
-    return {**state, "mapping_result": mapping_result}
+    print(
+        f"[Node: place_order_map] valid={mapping_result.get('is_valid')}  "
+        f"needs_clarification={needs_clarification}"
+    )
+
+    return {
+        **state,
+        "mapping_result": mapping_result
+    }
 
 
 def node_ask_clarification(state: OrderState) -> OrderState:
@@ -294,10 +318,16 @@ def route_by_intent(state: OrderState) -> str:
 
 def route_after_mapping(state: OrderState) -> str:
     mapping = state["mapping_result"]
+
+    if mapping.get("is_small_talk"):
+        return "end"   # or directly terminate
+
     if mapping.get("needs_clarification"):
         return "ask_clarification"
+
     if mapping.get("is_valid"):
         return "place_order_exec"
+
     return "handle_unknown"
 
 
