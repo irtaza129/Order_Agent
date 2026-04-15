@@ -238,8 +238,12 @@ def node_get_menu(state: OrderState) -> OrderState:
     if not items:
         voice_reply = "The menu is currently empty."
     else:
-        lines       = [f"{i.get('name')} — PKR {i.get('price', '?')}" for i in items]
-        voice_reply = "Here's our menu:\n" + "\n".join(f"  • {l}" for l in lines)
+        # Plain spoken text only — no bullets, dashes, or emojis for TTS compatibility
+        item_list   = ", ".join(
+            f"{i.get('name')} for PKR {i.get('price', '?')}"
+            for i in items
+        )
+        voice_reply = f"Here is our menu. {item_list}. What would you like to order?"
     print(f"[Node: get_menu] Returning {len(items)} items")
     return {**state, "api_response": state["menu"], "voice_reply": voice_reply, "status": "success"}
 
@@ -300,7 +304,7 @@ def node_handle_unknown(state: OrderState) -> OrderState:
 
 def node_end_order(state: OrderState) -> OrderState:
     return {**state, "api_response": {}, "status": "success",
-            "voice_reply": "Thank you for your order! Have a great meal. Goodbye!"}
+            "voice_reply": "Thank you for your order Have a great meal. Goodbye!"}
 
 
 # ── Routers ───────────────────────────────────────────────────────────────────

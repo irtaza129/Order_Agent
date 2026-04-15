@@ -107,7 +107,7 @@ def order_endpoint(req: OrderRequest):
 
     if intent_result in ["UNKNOWN", "SMALL_TALK"]:
         return OrderResponse(
-            voice_reply="Hey! Welcome to KFC 😊 What would you like to order?",
+            voice_reply="Hey! Welcome to KFC  What would you like to order?",
             status="small_talk",
             order_id=None,
             order_total=None,
