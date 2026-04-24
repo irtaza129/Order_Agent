@@ -1,11 +1,634 @@
-{
-  "single_items": [
-    {"id": "itm_01", "name": "Zinger Burger", "price": 500},
-    {"id": "itm_02", "name": "Pepsi 250ml", "aliases": ["drink", "cola", "soda"], "price": 100},
-    {"id": "itm_03", "name": "Fries", "price": 150}
-  ],
-  "deals": [
-    {"id": "deal_01", "name": "Mighty Combo", "includes": ["Zinger Burger", "Fries", "Pepsi 250ml"], "price": 700},
-    {"id": "deal_02", "name": "Zinger Deal", "includes": ["Zinger Burger", "Pepsi 250ml"], "price": 550}
-  ]
-}
+[
+  {
+    "id": 56,
+    "name": "Soft Drink 500ml",
+    "category": "Beverages",
+    "description": "Soft drink bottle medium size",
+    "price": 140,
+    "available": true
+  },
+  {
+    "id": 57,
+    "name": "Soft Drink 1 Liter",
+    "category": "Beverages",
+    "description": "One liter cold drink bottle",
+    "price": 220,
+    "available": true
+  },
+  {
+    "id": 58,
+    "name": "Soft Drink 1.5 Liter",
+    "category": "Beverages",
+    "description": "Family size soft drink bottle",
+    "price": 280,
+    "available": true
+  },
+  {
+    "id": 59,
+    "name": "Water 500ml",
+    "category": "Beverages",
+    "description": "Sealed drinking water bottle",
+    "price": 75,
+    "available": true
+  },
+  {
+    "id": 60,
+    "name": "Water 1.5 Liter",
+    "category": "Beverages",
+    "description": "Large mineral water bottle",
+    "price": 120,
+    "available": true
+  },
+  {
+    "id": 55,
+    "name": "Soft Drink Can Mirinda",
+    "category": "Beverages",
+    "description": "Chilled Mirinda can",
+    "price": 120,
+    "available": true
+  },
+  {
+    "id": 54,
+    "name": "Soft Drink Can 7up",
+    "category": "Beverages",
+    "description": "Chilled 7up can",
+    "price": 120,
+    "available": true
+  },
+  {
+    "id": 53,
+    "name": "Soft Drink Can Pepsi",
+    "category": "Beverages",
+    "description": "Chilled Pepsi can",
+    "price": 120,
+    "available": true
+  },
+  {
+    "id": 52,
+    "name": "Milk Coffee",
+    "category": "Beverages",
+    "description": "Coffee prepared with milk",
+    "price": 199,
+    "available": true
+  },
+  {
+    "id": 51,
+    "name": "Tea Cup",
+    "category": "Beverages",
+    "description": "Fresh hot tea cup",
+    "price": 130,
+    "available": true
+  },
+  {
+    "id": 74,
+    "name": "Omelette Toast",
+    "category": "Breakfast",
+    "description": "Omelette served with toast slices",
+    "price": 295,
+    "available": true
+  },
+  {
+    "id": 73,
+    "name": "Anda Paratha",
+    "category": "Breakfast",
+    "description": "Egg stuffed paratha breakfast",
+    "price": 260,
+    "available": true
+  },
+  {
+    "id": 72,
+    "name": "Naan Pair",
+    "category": "Breakfast",
+    "description": "Two fresh naan breads",
+    "price": 80,
+    "available": true
+  },
+  {
+    "id": 71,
+    "name": "Chana Plate",
+    "category": "Breakfast",
+    "description": "Spiced chickpea breakfast plate",
+    "price": 220,
+    "available": true
+  },
+  {
+    "id": 70,
+    "name": "Halwa Puri",
+    "category": "Breakfast",
+    "description": "Traditional breakfast with halwa puri and chana",
+    "price": 420,
+    "available": true
+  },
+  {
+    "id": 16,
+    "name": "Zinger Burger",
+    "category": "Burgers",
+    "description": "Spicy zinger style chicken fillet burger",
+    "price": 650,
+    "available": true
+  },
+  {
+    "id": 17,
+    "name": "Zinger Cheese Burger",
+    "category": "Burgers",
+    "description": "Zinger burger with added cheese slice",
+    "price": 720,
+    "available": true
+  },
+  {
+    "id": 11,
+    "name": "Krispo Burger",
+    "category": "Burgers",
+    "description": "Crispy chicken fillet burger with sauce and lettuce",
+    "price": 610,
+    "available": true
+  },
+  {
+    "id": 19,
+    "name": "Beef Burger",
+    "category": "Burgers",
+    "description": "Juicy beef burger with sauces and vegetables",
+    "price": 690,
+    "available": true
+  },
+  {
+    "id": 20,
+    "name": "Kids Burger",
+    "category": "Burgers",
+    "description": "Small burger meal suitable for kids",
+    "price": 420,
+    "available": true
+  },
+  {
+    "id": 18,
+    "name": "Double Patty Burger",
+    "category": "Burgers",
+    "description": "Double chicken patty burger for larger appetite",
+    "price": 890,
+    "available": true
+  },
+  {
+    "id": 12,
+    "name": "Krispo Burger Cheese",
+    "category": "Burgers",
+    "description": "Crispy chicken burger topped with cheese slice",
+    "price": 660,
+    "available": true
+  },
+  {
+    "id": 13,
+    "name": "Krispo Burger Fries Combo",
+    "category": "Burgers",
+    "description": "Krispo burger served with fries and dip",
+    "price": 810,
+    "available": true
+  },
+  {
+    "id": 14,
+    "name": "Chicken Burger",
+    "category": "Burgers",
+    "description": "Classic chicken patty burger with mayo sauce",
+    "price": 510,
+    "available": true
+  },
+  {
+    "id": 15,
+    "name": "Chicken Burger Fries Combo",
+    "category": "Burgers",
+    "description": "Chicken burger with crispy fries combo meal",
+    "price": 705,
+    "available": true
+  },
+  {
+    "id": 35,
+    "name": "Family Deal 2",
+    "category": "Deals",
+    "description": "Large family feast with multiple items",
+    "price": 3299,
+    "available": true
+  },
+  {
+    "id": 40,
+    "name": "Weekend Deal",
+    "category": "Deals",
+    "description": "Special weekend family combo package",
+    "price": 1799,
+    "available": true
+  },
+  {
+    "id": 39,
+    "name": "Dinner Deal",
+    "category": "Deals",
+    "description": "Evening combo meal with burger fries and drink",
+    "price": 899,
+    "available": true
+  },
+  {
+    "id": 38,
+    "name": "Lunch Deal",
+    "category": "Deals",
+    "description": "Midday combo meal with selected items",
+    "price": 745,
+    "available": true
+  },
+  {
+    "id": 37,
+    "name": "Student Deal",
+    "category": "Deals",
+    "description": "Budget meal for students with burger and drink",
+    "price": 699,
+    "available": true
+  },
+  {
+    "id": 31,
+    "name": "My Deal",
+    "category": "Deals",
+    "description": "Burger chicken piece fries and drink combo",
+    "price": 999,
+    "available": true
+  },
+  {
+    "id": 32,
+    "name": "Burger Deal 1",
+    "category": "Deals",
+    "description": "One burger fries and drink meal",
+    "price": 899,
+    "available": true
+  },
+  {
+    "id": 33,
+    "name": "Burger Deal 2",
+    "category": "Deals",
+    "description": "Two burgers fries and drinks combo",
+    "price": 1399,
+    "available": true
+  },
+  {
+    "id": 34,
+    "name": "Family Deal 1",
+    "category": "Deals",
+    "description": "Family meal with burgers chicken fries and drinks",
+    "price": 2499,
+    "available": true
+  },
+  {
+    "id": 36,
+    "name": "Wings Combo",
+    "category": "Deals",
+    "description": "Wings fries and drink combo offer",
+    "price": 799,
+    "available": true
+  },
+  {
+    "id": 49,
+    "name": "Ice Cream Two Scoop",
+    "category": "Desserts",
+    "description": "Two scoop ice cream serving",
+    "price": 320,
+    "available": true
+  },
+  {
+    "id": 41,
+    "name": "Kheer Cup",
+    "category": "Desserts",
+    "description": "Traditional rice pudding in single cup",
+    "price": 210,
+    "available": true
+  },
+  {
+    "id": 42,
+    "name": "Kheer Box 3 Serving",
+    "category": "Desserts",
+    "description": "Family dessert box with three servings",
+    "price": 560,
+    "available": true
+  },
+  {
+    "id": 43,
+    "name": "Kheer 1 Kg",
+    "category": "Desserts",
+    "description": "One kilogram traditional kheer pack",
+    "price": 850,
+    "available": true
+  },
+  {
+    "id": 44,
+    "name": "Kheer 2 Kg",
+    "category": "Desserts",
+    "description": "Two kilogram dessert tub for family",
+    "price": 1600,
+    "available": true
+  },
+  {
+    "id": 45,
+    "name": "Kheer 5 Kg",
+    "category": "Desserts",
+    "description": "Bulk kheer order for events",
+    "price": 3900,
+    "available": true
+  },
+  {
+    "id": 46,
+    "name": "Zarda Cup",
+    "category": "Desserts",
+    "description": "Sweet colored rice dessert single cup",
+    "price": 195,
+    "available": true
+  },
+  {
+    "id": 47,
+    "name": "Zarda Box",
+    "category": "Desserts",
+    "description": "Family box of traditional zarda",
+    "price": 525,
+    "available": true
+  },
+  {
+    "id": 48,
+    "name": "Ice Cream One Scoop",
+    "category": "Desserts",
+    "description": "Single scoop ice cream dessert",
+    "price": 180,
+    "available": true
+  },
+  {
+    "id": 50,
+    "name": "Falooda",
+    "category": "Desserts",
+    "description": "Cold falooda dessert with noodles and ice cream",
+    "price": 350,
+    "available": true
+  },
+  {
+    "id": 24,
+    "name": "Krispo Chicken Piece",
+    "category": "Fried",
+    "description": "Single crispy fried chicken piece",
+    "price": 299,
+    "available": true
+  },
+  {
+    "id": 30,
+    "name": "Nuggets 10 pcs",
+    "category": "Fried",
+    "description": "Ten crispy nuggets for sharing",
+    "price": 599,
+    "available": true
+  },
+  {
+    "id": 29,
+    "name": "Nuggets 6 pcs",
+    "category": "Fried",
+    "description": "Six chicken nuggets served with sauce",
+    "price": 399,
+    "available": true
+  },
+  {
+    "id": 28,
+    "name": "French Fries Large",
+    "category": "Fried",
+    "description": "Large family portion fries",
+    "price": 355,
+    "available": true
+  },
+  {
+    "id": 27,
+    "name": "French Fries Medium",
+    "category": "Fried",
+    "description": "Medium portion crispy fries",
+    "price": 275,
+    "available": true
+  },
+  {
+    "id": 23,
+    "name": "Krispo Wings 10 pcs",
+    "category": "Fried",
+    "description": "Ten piece wings bucket for sharing",
+    "price": 699,
+    "available": true
+  },
+  {
+    "id": 22,
+    "name": "Krispo Wings 6 pcs",
+    "category": "Fried",
+    "description": "Six crispy wings seasoned and fried golden",
+    "price": 449,
+    "available": true
+  },
+  {
+    "id": 26,
+    "name": "French Fries Small",
+    "category": "Fried",
+    "description": "Small portion golden french fries",
+    "price": 225,
+    "available": true
+  },
+  {
+    "id": 21,
+    "name": "Krispo Wings 4 pcs",
+    "category": "Fried",
+    "description": "Four crispy fried chicken wings with dip",
+    "price": 349,
+    "available": true
+  },
+  {
+    "id": 25,
+    "name": "Krispo Chicken 2 Piece",
+    "category": "Fried",
+    "description": "Two crispy fried chicken pieces combo",
+    "price": 540,
+    "available": true
+  },
+  {
+    "id": 10,
+    "name": "Salad Extra",
+    "category": "Pulao",
+    "description": "Fresh chopped salad side portion",
+    "price": 35,
+    "available": true
+  },
+  {
+    "id": 2,
+    "name": "Single Choice",
+    "category": "Pulao",
+    "description": "Chicken pulao with selected chicken piece plus kababs salad and raita",
+    "price": 665,
+    "available": true
+  },
+  {
+    "id": 3,
+    "name": "Single Without Kabab",
+    "category": "Pulao",
+    "description": "Chicken pulao rice with one chicken piece salad and raita no kabab",
+    "price": 585,
+    "available": true
+  },
+  {
+    "id": 4,
+    "name": "Special Choice",
+    "category": "Pulao",
+    "description": "Large serving pulao with two chicken pieces two kababs salad and raita",
+    "price": 845,
+    "available": true
+  },
+  {
+    "id": 5,
+    "name": "Pulao",
+    "category": "Pulao",
+    "description": "Plain savour style rice platter served with salad and raita",
+    "price": 335,
+    "available": true
+  },
+  {
+    "id": 6,
+    "name": "Pulao Kabab",
+    "category": "Pulao",
+    "description": "Plain pulao rice with two shami kababs salad and raita",
+    "price": 445,
+    "available": true
+  },
+  {
+    "id": 7,
+    "name": "Chicken Piece Addon",
+    "category": "Pulao",
+    "description": "Extra steamed chicken piece add on for any meal",
+    "price": 205,
+    "available": true
+  },
+  {
+    "id": 8,
+    "name": "Shami Kabab Addon",
+    "category": "Pulao",
+    "description": "Single savour style shami kabab side item",
+    "price": 65,
+    "available": true
+  },
+  {
+    "id": 9,
+    "name": "Raita Extra",
+    "category": "Pulao",
+    "description": "Fresh yogurt raita side portion",
+    "price": 35,
+    "available": true
+  },
+  {
+    "id": 1,
+    "name": "Single",
+    "category": "Pulao",
+    "description": "Chicken pulao rice served with one chicken piece two shami kababs salad and raita",
+    "price": 645,
+    "available": true
+  },
+  {
+    "id": 75,
+    "name": "Ramzan Deal 1",
+    "category": "Seasonal",
+    "description": "Special fasting meal combo package",
+    "price": 899,
+    "available": true
+  },
+  {
+    "id": 76,
+    "name": "Ramzan Deal 2",
+    "category": "Seasonal",
+    "description": "Family iftar meal package",
+    "price": 1499,
+    "available": true
+  },
+  {
+    "id": 77,
+    "name": "Eid Family Deal",
+    "category": "Seasonal",
+    "description": "Special eid family celebration meal",
+    "price": 3599,
+    "available": true
+  },
+  {
+    "id": 78,
+    "name": "Winter Soup Cup",
+    "category": "Seasonal",
+    "description": "Hot soup served in winter season",
+    "price": 280,
+    "available": true
+  },
+  {
+    "id": 79,
+    "name": "Summer Lassi",
+    "category": "Seasonal",
+    "description": "Cold yogurt lassi drink for summer",
+    "price": 220,
+    "available": true
+  },
+  {
+    "id": 64,
+    "name": "Extra Cheese Slice",
+    "category": "Sides",
+    "description": "Extra cheese slice for burger",
+    "price": 80,
+    "available": true
+  },
+  {
+    "id": 63,
+    "name": "Chili Garlic Sauce",
+    "category": "Sides",
+    "description": "Spicy chili garlic dip",
+    "price": 35,
+    "available": true
+  },
+  {
+    "id": 66,
+    "name": "Disposable Plate",
+    "category": "Sides",
+    "description": "Single disposable serving plate",
+    "price": 10,
+    "available": true
+  },
+  {
+    "id": 61,
+    "name": "Ketchup Sachet",
+    "category": "Sides",
+    "description": "Tomato ketchup single sachet",
+    "price": 12,
+    "available": true
+  },
+  {
+    "id": 62,
+    "name": "Garlic Dip",
+    "category": "Sides",
+    "description": "Creamy garlic dipping sauce",
+    "price": 35,
+    "available": true
+  },
+  {
+    "id": 67,
+    "name": "Spoon Fork Set",
+    "category": "Sides",
+    "description": "Disposable spoon and fork set",
+    "price": 15,
+    "available": true
+  },
+  {
+    "id": 68,
+    "name": "Family Raita",
+    "category": "Sides",
+    "description": "Large bowl of yogurt raita",
+    "price": 120,
+    "available": true
+  },
+  {
+    "id": 69,
+    "name": "Family Salad",
+    "category": "Sides",
+    "description": "Large fresh salad bowl",
+    "price": 120,
+    "available": true
+  },
+  {
+    "id": 65,
+    "name": "Bread Bun",
+    "category": "Sides",
+    "description": "Fresh burger bun extra piece",
+    "price": 45,
+    "available": true
+  }
+]

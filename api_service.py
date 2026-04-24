@@ -1,165 +1,134 @@
-"""
-api_service.py — FastAPI wrapper around the LangGraph order agent.
-Maintains per-session conversation history using session_id.
-
-Run:
-    uvicorn api_service:app --host 0.0.0.0 --port 8000 --reload
-
-Endpoints:
-    POST /order          — place or manage an order
-    DELETE /session/{id} — clear a session's history
-    GET  /session/{id}   — inspect a session's history (debug)
-    GET  /               — health check
-"""
-
-import os
-from dotenv import load_dotenv
-from pathlib import Path
-
-load_dotenv(Path(__file__).resolve().parent / ".env")
-
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+
+import logging
+import logging.config
+
+import asyncio
+import threading
+
 from agent.langgraph_agent import process_order, classify_intent_only
+from agent.mapping_agent import detect_roman_urdu
+import agent.mapping_agent as mapping_agent
+from api.order_api import get_cached_menu, get_menu_if_cached, start_cache_refresh, register_refresh_callback
 
-app = FastAPI(title="KFC Order Agent API")
+app = FastAPI()
 
-# CORS: allow calls from browser clients during development
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, replace with specific origins
-    allow_credentials=True,
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-MAX_HISTORY_TURNS = 4   # keep last N turns (1 turn = 1 user + 1 agent message)
+# Configure basic logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(name)s: %(message)s')
+log = logging.getLogger("api")
 
-# Map intents to short filler keys (client caches .wav for these keys)
-FILLER_MAP = {
-    "PLACE_ORDER": "processing",
-    "GET_MENU": "fetching",
-    "CREATE_ITEM": "processing",
-    "UPDATE_ITEM": "processing",
-    "DELETE_ITEM": "processing",
-    "END_ORDER": None,
-    "UNKNOWN": None,
-    "SMALL_TALK": None
-}
+_sessions = {}
+_session_state = {}
 
-# ── In-memory session store ────────────────────────────────────────────────
-# key:   session_id (str)
-# value: list of {"role": "user"|"assistant", "content": str}
-_sessions: dict[str, list] = {}
-
-
-def _trim(history: list) -> list:
-    """Keep only the last MAX_HISTORY_TURNS turns."""
-    return history[-(MAX_HISTORY_TURNS * 2):]
-
-
-# ── Request / Response schemas ─────────────────────────────────────────────
+def get_state(session_id: str) -> dict:
+    """Return per-session mutable state, creating defaults when missing."""
+    if session_id not in _session_state:
+        _session_state[session_id] = {
+            "pending_cart": [],
+            "session_orders":[],
+            "session_language": "en", # 🔴 NEW: Track session language globally
+            "awaiting_confirmation": False,
+        }
+    return _session_state[session_id]
 
 class OrderRequest(BaseModel):
-    text:        str
-    session_id:  str                  # required — whisper generates UUID per call session
+    text: str
+    session_id: str
     customer_id: str | None = None
 
-
-class OrderResponse(BaseModel):
-    voice_reply: str
-    status:      str
-    order_id:    str | None = None
-    order_total: float | None = None
-    session_id:  str
-
-
-# Lightweight intent-only request/response for pre-flight intent check
-class IntentRequest(BaseModel):
-    text:       str
-    session_id: str
+def _build_embeddings_from(menu_data):
+    """Rebuild item embeddings whenever the menu is refreshed."""
+    try:
+        m = {"single_items": menu_data} if isinstance(menu_data, list) else menu_data
+        if m.get("single_items"):
+            mapping_agent.invalidate_embeddings_cache()
+            mapping_agent.build_item_embeddings(m)
+            log.info("startup/refresh: item embeddings built (%d items)", len(m["single_items"]))
+    except Exception as e:
+        log.exception("_build_embeddings_from: failed: %s", e)
 
 
-class IntentResponse(BaseModel):
-    intent: str
-    filler: str | None = None
+def _wait_and_build_embeddings():
+    """Poll until initial menu fetch completes, then pre-build embeddings."""
+    for _ in range(30):                      # up to 30 s wait
+        data = get_menu_if_cached()
+        if data:
+            _build_embeddings_from(data)
+            return
+        threading.Event().wait(1)
+    log.warning("startup: embeddings not pre-built — menu unavailable after 30 s")
 
 
-# Fast intent endpoint: classify intent and return filler key for client TTS cache
-@app.post("/intent", response_model=IntentResponse)
-def intent_endpoint(req: IntentRequest):
+@app.on_event("startup")
+def startup():
+    log.info("startup: warming menu cache and starting refresher")
+    # Rebuild embeddings automatically on every background menu refresh
+    register_refresh_callback(_build_embeddings_from)
+    start_cache_refresh()                    # initial fetch fires immediately in background
+
+    # Preload heavy models (embedder) to avoid per-request latency
+    try:
+        log.info("startup: preloading semantic embedder")
+        mapping_agent.get_embedder()
+        log.info("startup: embedder loaded")
+    except Exception as e:
+        log.exception("startup: embedder preload failed: %s", e)
+
+    # Pre-build item embeddings once menu arrives (non-blocking)
+    threading.Thread(target=_wait_and_build_embeddings, daemon=True).start()
+
+@app.post("/order")
+async def order(req: OrderRequest):
+    log.info("/order: session=%s customer=%s text=%s", req.session_id, req.customer_id, req.text)
     history = _sessions.get(req.session_id, [])
-    intent = classify_intent_only(req.text, _trim(history))
-    filler = FILLER_MAP.get(intent)
-    return IntentResponse(intent=intent, filler=filler)
+    state = get_state(req.session_id)
 
+    if detect_roman_urdu(req.text):
+        state["session_language"] = "roman_urdu"
 
-# ── Endpoints ──────────────────────────────────────────────────────────────
+    cached_menu = get_cached_menu()
+    if isinstance(cached_menu, list):
+        cached_menu = {"single_items": cached_menu}
 
-@app.post("/order", response_model=OrderResponse)
-def order_endpoint(req: OrderRequest):
-
-    history = _sessions.get(req.session_id, [])
-
-    # 🔴 EARLY SMALL TALK CHECK
-    intent_result = classify_intent_only(req.text, _trim(history))
-
-    if intent_result in ["UNKNOWN", "SMALL_TALK"]:
-        return OrderResponse(
-            voice_reply="Hey! Welcome to KFC  What would you like to order?",
-            status="small_talk",
-            order_id=None,
-            order_total=None,
-            session_id=req.session_id,
-        )
-
-    # ONLY THEN run graph
-    result = process_order(
+    result = await asyncio.to_thread(
+        process_order,
         raw_input=req.text,
         customer_id=req.customer_id,
-        history=_trim(history),
+        history=history,
+        pending_cart=state["pending_cart"],
+        session_orders=state["session_orders"],
+        reply_language=state["session_language"],
+        session_language=state["session_language"],
+        cached_menu=cached_menu,
+        awaiting_confirmation=state["awaiting_confirmation"],
     )
 
-    # Append this turn to history and save back
-    history.append({"role": "user",      "content": req.text})
-    history.append({"role": "assistant", "content": result.get("voice_reply", "")})
-    _sessions[req.session_id] = _trim(history)
+    history += [
+        {"role": "user", "content": req.text},
+        {"role": "assistant", "content": result.get("voice_reply", "")},
+    ]
+    _sessions[req.session_id] = history[-10:]
 
-    return OrderResponse(
-        voice_reply=result.get("voice_reply", ""),
-        status=result.get("status", "error"),
-        order_id=str(result.get("order_id")) if result.get("order_id") is not None else None,
-        order_total=result.get("order_total"),
-        session_id=req.session_id,
-    )
+    state["pending_cart"] = result.get("pending_cart", [])
+    state["session_language"] = result.get("reply_language", state["session_language"])
+    state["awaiting_confirmation"] = result.get("awaiting_confirmation", False)
+    _session_state[req.session_id] = state
 
+    log.info("/order: updated state pending_cart=%s awaiting_confirmation=%s", len(state["pending_cart"]), state["awaiting_confirmation"])
 
-@app.delete("/session/{session_id}")
-def clear_session(session_id: str):
-    """Call this when a voice call ends to free memory."""
-    if session_id in _sessions:
-        del _sessions[session_id]
-    return {"cleared": session_id}
+    result.pop("menu", None)
+    return result
 
 
-@app.get("/session/{session_id}")
-def get_session(session_id: str):
-    """Debug endpoint — inspect what history is stored for a session."""
-    history = _sessions.get(session_id)
-    if history is None:
-        raise HTTPException(status_code=404, detail="Session not found")
-    return {"session_id": session_id, "turns": len(history) // 2, "history": history}
-
-
-@app.get("/")
-def root():
-    return {
-        "status":   "ok",
-        "message":  "KFC Order Agent API is running",
-        "sessions": len(_sessions),
-    }
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run("api_service:app", host="0.0.0.0", port=8000, reload=True)
+@app.post("/intent")
+def intent(req: OrderRequest):
+    return {"intent": classify_intent_only(req.text)}

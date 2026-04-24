@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pip install *)",
+      "Bash(python -c \"from deepgram import DeepgramClient, LiveTranscriptionEvents, LiveOptions; from deepgram.audio.microphone import Microphone; print\\('deepgram OK'\\)\")",
+      "Bash(C:/Users/user/AppData/Local/Programs/Python/Python312/python.exe -m pip install deepgram-sdk httpx pyaudio --quiet)",
+      "Bash(C:/Users/user/AppData/Local/Programs/Python/Python312/python.exe -c \"from deepgram import DeepgramClient, LiveTranscriptionEvents, LiveOptions; from deepgram.audio.microphone import Microphone; import httpx, pyaudio; print\\('All voice imports OK'\\)\")",
+      "Bash(C:/Users/user/AppData/Local/Programs/Python/Python312/python.exe -c \"import deepgram; print\\(deepgram.__version__\\)\")",
+      "Bash(C:/Users/user/AppData/Local/Programs/Python/Python312/python.exe -c ' *)",
+      "Read(//c/Users/user/AppData/Local/Programs/Python/Python312/Lib/site-packages/deepgram/**)",
+      "Bash(C:/Users/user/AppData/Local/Programs/Python/Python312/python.exe -m pip install python-dotenv --quiet)",
+      "Bash(python -c ' *)"
+    ]
+  }
+}

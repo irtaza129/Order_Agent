@@ -5,8 +5,12 @@ Run from Order_Agent/: python main.py
 
 import os
 import sys
+import logging
 
 from agent.langgraph_agent import process_order, classify_intent_only
+
+# Module logger
+log = logging.getLogger("main")
 
 if not os.getenv("OPENAI_API_KEY"):
     print("WARNING: OPENAI_API_KEY is not set.\n")
@@ -41,6 +45,7 @@ def run_cli() -> None:
     print("=" * 60 + "\n")
 
     history = []   # list of {"role": "user"|"assistant", "content": str}
+    log.info("run_cli: starting interactive CLI")
 
     while True:
         try:
@@ -48,6 +53,7 @@ def run_cli() -> None:
         except (EOFError, KeyboardInterrupt):
             print("\nAgent: Goodbye!")
             break
+        log.debug("run_cli: user_input=%s", raw)
         if not raw:
             continue
         if raw.lower() in ("quit", "exit", "q"):
@@ -59,6 +65,7 @@ def run_cli() -> None:
             customer_id="cli_user",
             history=_trim_history(history),
         )
+        log.debug("run_cli: process_order result_status=%s", result.get("status"))
         print(f"\nAgent: {result['voice_reply']}")
 
         # Clarification loop — agent asks a follow-up question
@@ -109,6 +116,7 @@ def run_demo() -> None:
     history = []
     for case in cases:
         print(f"Customer : {case}")
+        log.info("run_demo: case=%s", case)
         result = process_order(raw_input=case, history=_trim_history(history))
         print(f"Agent    : {result['voice_reply']}")
         history.append({"role": "user",     "content": case})

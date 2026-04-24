@@ -1,100 +1,127 @@
-"""
-Order API — api/order_api.py
-"""
-
-import os
-import json
-import logging
-
+import os, json, logging, threading, time
 import requests
-from dotenv import load_dotenv
-from pathlib import Path
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
-load_dotenv(Path(__file__).resolve().parent.parent / ".env")
-
 BASE_URL = os.getenv("API_BASE_URL", "https://voiceai-hzyb.onrender.com")
-TIMEOUT  = int(os.getenv("API_TIMEOUT", 60))
-HEADERS  = {"accept": "application/json", "Content-Type": "application/json"}
+TIMEOUT = int(os.getenv("API_TIMEOUT", 60))
 
-# ── Logger ────────────────────────────────────────────────────────────────────
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [ORDER_API] %(levelname)s — %(message)s",
-    datefmt="%H:%M:%S",
-)
 log = logging.getLogger("order_api")
 
+# ── SINGLE SESSION (important optimization) ──
+_session = requests.Session()
+_session.mount("https://", HTTPAdapter(
+    max_retries=Retry(total=3, backoff_factor=1)
+))
 
-def _session():
-    session = requests.Session()
-    retry   = Retry(total=3, backoff_factor=2, status_forcelist=[502, 503, 504])
-    session.mount("https://", HTTPAdapter(max_retries=retry))
-    return session
+HEADERS = {"accept": "application/json", "Content-Type": "application/json"}
+
+# ── CACHE ─────────────────────────────
+MENU_CACHE = {"data": None, "ts": 0}
+CACHE_TTL = int(os.getenv("MENU_CACHE_TTL", 300))
+LOCK = threading.Lock()
 
 
-def _handle(response, label: str) -> dict:
-    log.info("← %s | status=%s | body=%s", label, response.status_code, response.text[:300])
+def _request(method, url, **kwargs):
     try:
-        response.raise_for_status()
-        return response.json()
-    except requests.HTTPError as e:
-        return {"error": str(e), "status_code": response.status_code, "body": response.text}
+        log.debug("_request: method=%s url=%s kwargs=%s", method, url, {k: v for k, v in kwargs.items() if k != 'json'})
+        r = _session.request(method, url, timeout=TIMEOUT, headers=HEADERS, **kwargs)
+        r.raise_for_status()
+        data = r.json()
+        log.debug("_request: success url=%s status=%s", url, r.status_code)
+        return data
     except Exception as e:
+        log.exception("_request: failed url=%s error=%s", url, e)
         return {"error": str(e)}
 
 
+# ── MENU ─────────────────────────────
 def get_menu():
-    url = f"{BASE_URL}/menu"
-    log.info("→ GET %s", url)
-    resp = _session().get(url, headers=HEADERS, timeout=TIMEOUT)
-    return _handle(resp, "GET /menu")
+    log.info("get_menu: fetching live menu from %s", BASE_URL)
+    return _request("GET", f"{BASE_URL}/menu")
 
 
-def create_menu_item(name, category, price, description="", available=True):
-    url     = f"{BASE_URL}/menu"
-    payload = {"name": name, "category": category,
-               "description": description, "price": price, "available": available}
-    log.info("→ POST %s | payload=%s", url, json.dumps(payload))
-    resp = _session().post(url, json=payload, headers=HEADERS, timeout=TIMEOUT)
-    return _handle(resp, "POST /menu")
+def get_cached_menu():
+    with LOCK:
+        if MENU_CACHE["data"] and time.time() - MENU_CACHE["ts"] < CACHE_TTL:
+            log.debug("get_cached_menu: returning cached menu (age=%s)", time.time()-MENU_CACHE["ts"])
+            return MENU_CACHE["data"]
+
+    data = get_menu()
+    
+    # 🔴 FIX: NEVER CACHE AN ERROR PAYLOAD
+    if "error" not in data:
+        with LOCK:
+            MENU_CACHE["data"] = data
+            MENU_CACHE["ts"] = time.time()
+        log.info("get_cached_menu: cache refreshed successfully.")
+    else:
+        log.warning("get_cached_menu: API returned error, refusing to update cache.")
+
+    return data
 
 
-def update_menu_item(item_id, name, category, price, description="", available=True):
-    url     = f"{BASE_URL}/menu/{item_id}"
-    payload = {"name": name, "category": category,
-               "description": description, "price": price, "available": available}
-    log.info("→ PUT %s | payload=%s", url, json.dumps(payload))
-    resp = _session().put(url, json=payload, headers=HEADERS, timeout=TIMEOUT)
-    return _handle(resp, f"PUT /menu/{item_id}")
+# ── ORDERS ───────────────────────────
+def create_order(cart, customer_name="Guest"):
+    items = []
+    for i in cart:
+        try:
+            items.append({"menu_item_id": int(i["item_id"]), "quantity": int(i.get("qty", 1))})
+        except (ValueError, TypeError):
+            log.warning("create_order: skipping item with non-integer item_id=%s", i.get("item_id"))
+    payload = {
+        "customer_name": customer_name,
+        "items": items,
+    }
+    log.info("create_order: customer=%s items=%s", customer_name, len(cart))
+    res = _request("POST", f"{BASE_URL}/orders", json=payload)
+    log.debug("create_order: response=%s", res)
+    return res
 
 
-def delete_menu_item(item_id):
-    url = f"{BASE_URL}/menu/{item_id}"
-    log.info("→ DELETE %s", url)
-    resp = _session().delete(url, headers=HEADERS, timeout=TIMEOUT)
-    return _handle(resp, f"DELETE /menu/{item_id}")
+# ── BACKGROUND REFRESH ───────────────
+_on_refresh_callbacks: list = []
 
 
-def create_order(cart, customer_name: str = "Guest"):
-    """
-    POST /orders
-    Transforms internal cart into API payload:
-        {"customer_name": str, "items": [{"menu_item_id": int, "quantity": int}]}
-    """
-    url   = f"{BASE_URL}/orders"
-    items = [
-        {
-            "menu_item_id": int(item["item_id"]),
-            "quantity":     int(item.get("qty", 1)),
-        }
-        for item in cart
-    ]
-    payload = {"customer_name": customer_name, "items": items}
+def register_refresh_callback(fn):
+    """Register a callable invoked after each successful menu refresh."""
+    _on_refresh_callbacks.append(fn)
 
-    log.info("→ POST %s | payload=%s", url, json.dumps(payload))
-    resp   = _session().post(url, json=payload, headers=HEADERS, timeout=TIMEOUT)
-    result = _handle(resp, "POST /orders")
-    log.info("Order placed in DB: %s", json.dumps(result))
-    return result
+
+def get_menu_if_cached():
+    """Return cached menu without blocking HTTP; None if not yet populated."""
+    with LOCK:
+        return MENU_CACHE["data"]
+
+
+def start_cache_refresh():
+    def _populate(data):
+        if "error" not in data:
+            with LOCK:
+                MENU_CACHE["data"] = data
+                MENU_CACHE["ts"] = time.time()
+            for cb in _on_refresh_callbacks:
+                try:
+                    cb(data)
+                except Exception as e:
+                    log.exception("refresh callback failed: %s", e)
+            return True
+        return False
+
+    def loop():
+        # Initial fetch immediately so first request hits the cache
+        try:
+            log.info("start_cache_refresh: initial menu fetch")
+            _populate(get_menu())
+        except Exception as e:
+            log.exception("start_cache_refresh: initial fetch failed: %s", e)
+
+        while True:
+            time.sleep(CACHE_TTL)
+            try:
+                log.info("start_cache_refresh: periodic refresh")
+                _populate(get_menu())
+            except Exception as e:
+                log.exception("start_cache_refresh: refresh failed: %s", e)
+
+    threading.Thread(target=loop, daemon=True).start()
